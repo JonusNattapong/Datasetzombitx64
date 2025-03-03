@@ -1,0 +1,37 @@
+{
+  "mistral_api_key": "",
+  "youtube_api_key": "",
+  "google_api_key": "",
+  "cse_id": "",
+  "tasks": [
+    {
+      "source": "youtube",
+      "query": "https://www.youtube.com/watch?v=OTkq4OsG_Yc",
+      "task": "summarize",
+      "prompt": "Summarize the video content"
+    },
+    {
+      "source": "google",
+      "query": "Poker Theory",
+      "task": "analyze",
+      "prompt": "Analyze the sentiment and key points"
+    },
+    {
+      "source": "pdf",
+      "query": "https://arxiv.org/pdf/2502.19634",
+      "task": "extract",
+      "prompt": "Extract key findings"
+    },
+    {
+      "source": "pdf",
+      "query": "datasets/No_Limit_Holdem_Theory_and_Practice.pdf",
+      "task": "summarize",
+      "prompt": "Summarize the document"
+    },
+    {
+      "query": "Poker",
+      "task": "text_classification",
+      "prompt": "Classify the topic of this text"
+    }
+  ]
+}

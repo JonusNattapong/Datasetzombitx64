@@ -1,0 +1,11 @@
+transformers
+torch
+PyPDF2
+requests
+aiohttp
+beautifulsoup4
+sentence-transformers
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+python-dotenv
