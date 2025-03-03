@@ -56,44 +56,59 @@ class APIClient:
             "Content-Type": "application/json"
         }
         payload = {
-            "model": "pixtral-large-2411",
+            "model": "mistral-large-latest",
             "messages": [{"role": "user", "content": f"Task: {task}\nPrompt: {prompt}\nText: {text}"}],
-            "max_tokens": 2000,
+            "max_tokens": 1000,
             "temperature": 0.7
         }
-        async with aiohttp.ClientSession() as session:
+
+        text = filter_text(text)
+        if len(text) > 500:
+            text = text[:500]
+
+        retries = 5
+        delay = 3  # Initial delay in seconds
+        timeout = aiohttp.ClientTimeout(total=60, connect=30)  # Increased timeout
+
+        for attempt in range(retries):
             try:
-                text = filter_text(text)
-                if len(text) > 500:
-                    text = text[:500]
-                # print(f"Sending text of length: {len(text)}")  # Debugging line
-
-                await asyncio.sleep(1)  # Short delay before each API call
-
-                retries = 3
-                delay = 5  # Initial delay in seconds
-
-                for attempt in range(retries):
-                    async with session.post(self.mistral_url, headers=headers, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.post(self.mistral_url, headers=headers, json=payload) as response:
                         if response.status == 200:
                             data = await response.json()
                             result = {"result": data["choices"][0]["message"]["content"]}
                             Display.message("done", f"Mistral processed {task}")
                             return result
                         elif response.status == 429:
-                            Display.message("warning", f"Mistral API rate limit hit. Retrying in {delay} seconds...")
+                            Display.message("warning", f"Rate limit hit. Retrying in {delay} seconds...")
                             await asyncio.sleep(delay)
                             delay *= 2  # Exponential backoff
+                            continue
                         else:
                             Display.message("error", f"Mistral API failed: {response.status}")
+                            if attempt < retries - 1:  # If not the last attempt
+                                await asyncio.sleep(delay)
+                                delay *= 2
+                                continue
                             return None
-                Display.message("error", "Mistral API failed after multiple retries.")
+            except asyncio.TimeoutError:
+                Display.message("error", f"Request timeout. Retrying... (Attempt {attempt + 1}/{retries})")
+                if attempt < retries - 1:
+                    await asyncio.sleep(delay)
+                    delay *= 2
+                    continue
+                Display.message("error", "All retry attempts failed due to timeout")
                 return None
-
             except Exception as e:
-                Display.message("error", f"Mistral error: {str(e)}")
-                Display.message("error", traceback.format_exc())
+                Display.message("error", f"Unexpected error: {str(e)}")
+                if attempt < retries - 1:
+                    await asyncio.sleep(delay)
+                    delay *= 2
+                    continue
                 return None
+        
+        Display.message("error", "All retry attempts failed")
+        return None
 
 # Data fetcher class
 class DataFetcher:
@@ -117,7 +132,6 @@ class DataFetcher:
             snippet = video_response["items"][0]["snippet"]
             content = f"Title: {snippet['title']}\nDescription: {snippet['description']}"
             Display.message("done", f"Fetched YouTube data: {url}")
-            # print(f"Raw YouTube content: {content}")  # Debugging line
             return content
         except HttpError as e:
             Display.message("error", f"YouTube API error: {str(e)}")
@@ -131,7 +145,6 @@ class DataFetcher:
             for item in response["items"]:
                 search_results += f"Title: {item['title']}\nLink: {item['link']}\nSnippet: {item['snippet']}\n\n"
             Display.message("done", f"Google search completed: Found {len(response['items'])} results")
-            # print(f"Raw Google content: {search_results}")  # Debugging line
             return search_results
         except HttpError as e:
             Display.message("error", f"Google API error: {str(e)}")
@@ -164,7 +177,6 @@ class DataFetcher:
                         content = soup.get_text(separator="\n").strip()
                         Display.message("done", f"Fetched web content from {url}")
                         Display.message("warning", f"Ensure {url} Terms of Service allows scraping.")
-                        # print(f"Raw Web content: {content}")  # Debugging line
                         return content
                     return ""
             except Exception as e:
@@ -183,14 +195,17 @@ class DataFetcher:
                     f.write(response.content)
                 pdf_path = local_path
             else:
-                pdf_path = url_or_path.replace("[", "").replace("]", "")  # Fix invalid characters
+                pdf_path = url_or_path.replace("[", "").replace("]", "")
             with open(pdf_path, "rb") as file:
                 reader = PyPDF2.PdfReader(file)
                 text = "".join([page.extract_text() or "" for page in reader.pages])
-            if url_or_path.startswith("http"):
-                os.remove(pdf_path)
+            # Always remove temp.pdf after processing
+            if url_or_path.startswith("http") and os.path.exists(pdf_path):
+                try:
+                    os.remove(pdf_path)
+                except Exception as e:
+                    Display.message("error", f"Failed to delete temp file: {e}")
             Display.message("done", f"Read PDF: {url_or_path}")
-            print(f"Raw PDF content: {text}")  # Debugging line
             return text
         except Exception as e:
             Display.message("error", f"PDF error: {str(e)}")
@@ -275,8 +290,8 @@ async def run(
     cse_id: str = ""
 ) -> Optional[str]:
     """Main function to run the data collection and processing pipeline."""
-    if not all([mistral_key, youtube_key, google_key, cse_id]):
-        Display.message("error", "Missing one or more API keys")
+    if not all([mistral_key]):
+        Display.message("error", "Missing Mistral API key")
         return None
     
     builder = DatasetBuilder(mistral_key, youtube_key, google_key, cse_id)
@@ -285,44 +300,132 @@ async def run(
     dataset = [r for r in results if r]
     return builder.save_dataset(dataset, name, output_format)
 
-# Example usage
+def get_user_tasks():
+    """Get tasks interactively from the user."""
+    tasks = []
+    print("\nAvailable sources:")
+    print("1. YouTube (requires YouTube API key)")
+    print("2. Google Search (requires Google API key)")
+    print("3. Web Page")
+    print("4. PDF File")
+    print("5. Direct Text")
+    print("6. Done adding tasks")
+    
+    while True:
+        try:
+            # Strip whitespace and handle empty input
+            choice_str = input("\nSelect source (1-6): ").strip()
+            if not choice_str:
+                print("Please enter a number between 1-6.")
+                continue
+                
+            choice = int(choice_str)
+            if choice == 6:
+                break
+            
+            if choice not in [1, 2, 3, 4, 5]:
+                print("Invalid choice. Please select 1-6.")
+                continue
+            
+            task = {}
+            
+            # Set source based on choice
+            sources = {1: "youtube", 2: "google", 3: "web", 4: "pdf"}
+            if choice != 5:  # If not direct text
+                task["source"] = sources[choice]
+            
+            # Get query based on source and validate
+            while True:
+                if choice == 1:
+                    query = input("\nEnter YouTube video URL (must contain 'youtube.com/watch?v=' or 'youtu.be/'): ").strip()
+                    if "youtube.com/watch?v=" in query or "youtu.be/" in query:
+                        task["query"] = query
+                        break
+                    print("Invalid YouTube URL. Please try again.")
+                elif choice == 2:
+                    query = input("\nEnter search query: ").strip()
+                    if query:
+                        task["query"] = query
+                        break
+                    print("Search query cannot be empty. Please try again.")
+                elif choice == 3:
+                    query = input("\nEnter web page URL (must start with http:// or https://): ").strip()
+                    if query.startswith(("http://", "https://")):
+                        task["query"] = query
+                        break
+                    print("Invalid URL. Must start with http:// or https://")
+                elif choice == 4:
+                    query = input("\nEnter PDF file path or URL (if URL, must end with .pdf): ").strip()
+                    if query.startswith(("http://", "https://")):
+                        if not query.endswith(".pdf"):
+                            print("URL must end with .pdf")
+                            continue
+                    task["query"] = query
+                    break
+                else:  # Direct text
+                    query = input("\nEnter text to process: ").strip()
+                    if query:
+                        task["query"] = query
+                        break
+                    print("Text cannot be empty. Please try again.")
+            
+            print("\nAvailable tasks:")
+            print("1. Summarize")
+            print("2. Analyze")
+            print("3. Extract key points")
+            print("4. Classify")
+            
+            task_choice = int(input("Select task (1-4): "))
+            task_types = {1: "summarize", 2: "analyze", 3: "extract", 4: "classify"}
+            task["task"] = task_types.get(task_choice, "summarize")
+            
+            task["prompt"] = input("Enter prompt (or press Enter for default): ").strip()
+            if not task["prompt"]:
+                default_prompts = {
+                    "summarize": "Summarize the content",
+                    "analyze": "Analyze the main points and sentiment",
+                    "extract": "Extract key information and findings",
+                    "classify": "Classify the topic and sentiment"
+                }
+                task["prompt"] = default_prompts[task["task"]]
+            
+            tasks.append(task)
+            print(f"\n✅ Task {len(tasks)} added successfully")
+            
+        except ValueError:
+            print("Invalid input. Please enter a number.")
+        except Exception as e:
+            print(f"Error: {str(e)}")
+    
+    return tasks
+
 if __name__ == "__main__":
     load_dotenv()
+    print_ascii_art()
 
+    # Load API keys from .env or config.json
     try:
         with open("config.json", "r") as f:
             config = json.load(f)
     except FileNotFoundError:
-        Display.message("error", "config.json not found. Please create it.")
-        exit(1)
+        config = {"mistral_api_key": "", "youtube_api_key": "", "google_api_key": "", "cse_id": ""}
 
     MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", config["mistral_api_key"])
     YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", config["youtube_api_key"])
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", config["google_api_key"])
     CSE_ID = os.getenv("CSE_ID", config["cse_id"])
-    tasks = config["tasks"]
 
-    # Check if running in Google Colab - Removed as we are not in Colab
-    # is_colab = False
-    # try:
-    #     import google.colab
-    #     is_colab = True
-    #     Display.message("info", "Running in Google Colab environment")
+    if not MISTRAL_API_KEY:
+        Display.message("error", "Missing Mistral API key in .env or config.json")
+        exit(1)
 
-    #     # Try to mount Google Drive - Removed as we are not in Colab
-    #     try:
-    #         from google.colab import drive
-    #         drive.mount('/content/drive', force_remount=True)
-    #         os.makedirs("/content/drive/MyDrive/datasets", exist_ok=True)
-    #         Display.message("done", "Connected to Google Drive")
-    #         Display.message("warning", "Ensure datasets do not contain personal data per GDPR or copyrighted content without permission.")
-    #     except Exception as e:
-    #         Display.message("warning", f"Failed to mount Google Drive: {str(e)}")
-    #         Display.message("info", "Will use local storage instead")
-    # except ImportError:
-    #     Display.message("info", "Running in local environment")
+    Display.message("info", "Starting interactive task creation...")
+    tasks = get_user_tasks()
 
-    print_ascii_art()
+    if not tasks:
+        Display.message("error", "No tasks provided")
+        exit(1)
+
     output_path = asyncio.run(run(
         tasks,
         name="multi_source_dataset",
@@ -333,4 +436,4 @@ if __name__ == "__main__":
     ))
 
     if output_path:
-        print(f"Dataset saved at: {output_path}")
+        print(f"\nDataset saved at: {output_path}")

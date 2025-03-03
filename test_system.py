@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from datasetzombitx64 import run
+from Insightcrafter_zombitx64 import run
 
 async def test_basic_functionality():
     """Test basic text processing without external API calls."""

@@ -1,168 +1,91 @@
-# Dataset Collection and Processing Pipeline
+# InsightCrafter
 
-A comprehensive Python library for collecting data from multiple sources (YouTube, Google, web pages, PDFs) and processing text using both API-based (DeepSeek, Mistral) and local models.
+InsightCrafter is a Python-based tool designed to collect and process data from various sources, including YouTube videos, Google search results, web pages, and PDF documents. It leverages the Mistral API for advanced text processing capabilities, such as summarization, analysis, key point extraction, and classification.
 
 ## Features
 
-- Multi-source data collection:
-  - YouTube videos (title & description)
-  - Google search results
-  - Web pages (with robots.txt compliance)
-  - PDF documents (local and remote)
-- Text processing capabilities:
-  - Text classification
-  - Token classification (Named Entity Recognition)
-  - Text summarization
-  - Feature extraction
-  - Text generation
-- Model flexibility:
-  - Local models using HuggingFace Transformers
-  - API integration with DeepSeek and Mistral
-- Data output formats:
-  - JSON
-  - CSV
+- **Multiple Data Sources**: Supports data collection from YouTube, Google Search, web pages, and PDF files.
+- **Interactive Task Creation**: User-friendly command-line interface for creating and configuring tasks.
+- **Mistral API Integration**: Utilizes the Mistral API for powerful text processing.
+- **Robust Error Handling**: Includes comprehensive error handling and retry mechanisms for API requests.
+- **Data Validation**: Improved input validation to ensure correct data formats (URLs, file paths, etc.).
+- **Configurable Output**: Saves processed data in JSON or CSV format.
+- **Progress Indicators**: Displays real-time progress updates during data fetching and processing.
+- **Temporary File Handling**: Automatically removes temporary PDF files after processing.
 
 ## Requirements
 
-- Python 3.7+
-- PyTorch
-- Required API keys:
-  - DeepSeek API key
-  - Mistral API key
-  - YouTube Data API key
-  - Google Custom Search API key
-  - Google Custom Search Engine ID (CSE ID)
+- Python 3.7 or higher
+- Mistral API key
+- YouTube API key (optional, for YouTube data source)
+- Google API key and Custom Search Engine ID (optional, for Google Search data source)
+- Required Python packages (listed in `requirements.txt`)
 
 ## Installation
 
 1. Clone the repository:
-```bash
-git clone <repository-url>
-cd datasetzombitx64
-```
+   ```
+   git clone https://github.com/Zombitx64/Insightcrafter.git
+   cd InsightCrafter
+   ```
 
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+2. Install the required packages:
+   ```
+   pip install -r requirements.txt
+   ```
 
-3. Test the installation:
-```bash
-python test_system.py
-```
-
-This will run a basic functionality test using local models, without requiring API keys. The test processes two sample tasks:
-- Sentiment classification of a movie review
-- Named entity recognition in a sentence
-
-The test will generate a JSON file with the results in the `datasets` directory.
+3. Set up API keys:
+   - Create a `.env` file in the project root directory.
+   - Add your Mistral API key, YouTube API key (optional), Google API key (optional), and Custom Search Engine ID (optional) to the `.env` file:
+     ```
+     MISTRAL_API_KEY=your_mistral_api_key
+     YOUTUBE_API_KEY=your_youtube_api_key
+     GOOGLE_API_KEY=your_google_api_key
+     CSE_ID=your_custom_search_engine_id
+     ```
+   - Alternatively, you can add the API keys to `config.json`:
+      ```json
+      {
+        "mistral_api_key": "your_mistral_api_key",
+        "youtube_api_key": "your_youtube_api_key",
+        "google_api_key": "your_google_api_key",
+        "cse_id": "your_cse_id"
+      }
+      ```
 
 ## Usage
 
-### Basic Example
+Run the script `Insightcrafter_zombitx64.py` to start the interactive task creation process:
 
-```python
-import asyncio
-from datasetzombitx64 import run
-
-# Define your tasks
-tasks = [
-    {
-        "source": "youtube",
-        "query": "https://www.youtube.com/watch?v=example",
-        "task": "summarization",
-        "prompt": "Summarize the video content",
-        "use_api": "deepseek"
-    },
-    {
-        "source": "google",
-        "query": "AI advancements",
-        "task": "text_classification",
-        "prompt": "Classify sentiment",
-        "use_api": "mistral"
-    }
-]
-
-# Run the pipeline
-output_path = asyncio.run(run(
-    tasks,
-    name="my_dataset",
-    output_format="json",
-    deepseek_key="your_deepseek_key",
-    mistral_key="your_mistral_key",
-    youtube_key="your_youtube_key",
-    google_key="your_google_key",
-    cse_id="your_cse_id"
-))
-
-print(f"Dataset saved at: {output_path}")
+```
+python Insightcrafter_zombitx64.py
 ```
 
-### Task Configuration
+Follow the on-screen prompts to select data sources, enter queries, choose tasks, and provide prompts. The script will fetch and process the data, and then save the results in a JSON or CSV file in the `datasets` directory.
 
-Each task is defined as a dictionary with the following fields:
+### Example
 
-- `source`: Data source type ("youtube", "google", "web", "pdf", or "direct")
-- `query`: URL, search query, or direct text input
-- `task`: Processing task type ("text_classification", "token_classification", "summarization", "feature_extraction", "text_generation")
-- `prompt`: Optional prompt to guide the processing
-- `use_api`: Optional API to use ("deepseek" or "mistral"). If not specified, uses local models
+1.  **Select source**: Choose YouTube (option 1).
+2.  **Enter YouTube video URL**: Provide a valid YouTube video URL.
+3.  **Select task**: Choose Summarize (option 1).
+4.  **Enter prompt**: Press Enter to use the default prompt.
+5.  **Add more tasks or finish**: Choose option 6 to finish adding tasks.
 
-### Supported Tasks
+The script will then process the data and save the results.
 
-1. **Text Classification**
-   - Uses DistilBERT model fine-tuned on SST-2
-   - Classifies text sentiment or categories
+## Configuration
 
-2. **Token Classification (NER)**
-   - Uses BERT model fine-tuned on CoNLL-03
-   - Identifies named entities (persons, organizations, locations)
+You can configure the following options in the `config.json` file:
 
-3. **Summarization**
-   - Uses BART base model
-   - Generates concise summaries of longer texts
+-   `mistral_api_key`: Your Mistral API key.
+-   `youtube_api_key`: Your YouTube API key (optional).
+-   `google_api_key`: Your Google API key (optional).
+-   `cse_id`: Your Google Custom Search Engine ID (optional).
 
-4. **Feature Extraction**
-   - Uses Sentence Transformers (all-MiniLM-L6-v2)
-   - Generates text embeddings for similarity comparison
+## Contributing
 
-5. **Text Generation**
-   - Uses GPT-2 model
-   - Generates text continuations or completions
-
-## Output Format
-
-The generated dataset includes the following information for each task:
-
-```json
-{
-  "source": "youtube",
-  "query": "https://www.youtube.com/watch?v=example",
-  "task": "summarization",
-  "prompt": "Summarize the video content",
-  "content": "Original content...",
-  "result": "Processed result...",
-  "processed_by": "deepseek"
-}
-```
-
-## Error Handling
-
-The library includes comprehensive error handling:
-- API request failures
-- Model loading issues
-- Data fetching problems
-- File access errors
-
-All errors are logged with clear messages using the Display utility class.
-
-## Security and Compliance
-
-- Robots.txt compliance for web scraping
-- Rate limiting for API requests
-- Content permission warnings
-- Terms of Service compliance checks
+Contributions are welcome! Please feel free to submit pull requests or open issues to suggest improvements or report bugs.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

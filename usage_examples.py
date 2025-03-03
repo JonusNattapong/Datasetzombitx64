@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import asyncio
-from datasetzombitx64 import run
+from Insightcrafter_zombitx64 import run
 
 async def example_1_basic_text_processing():
     """Example 1: Basic text processing using local models."""
