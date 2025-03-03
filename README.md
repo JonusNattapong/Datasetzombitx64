@@ -1,3 +1,9 @@
+<div align="center">
+
+![Project Logo](./public/Zom.png)
+
+</div>
+
 # InsightCrafter
 
 InsightCrafter is a Python-based tool designed to collect and process data from various sources, including YouTube videos, Google search results, web pages, and PDF documents. It leverages the Mistral API for advanced text processing capabilities, such as summarization, analysis, key point extraction, and classification.
@@ -20,6 +26,10 @@ InsightCrafter is a Python-based tool designed to collect and process data from 
 - YouTube API key (optional, for YouTube data source)
 - Google API key and Custom Search Engine ID (optional, for Google Search data source)
 - Required Python packages (listed in `requirements.txt`)
+- 
+![image3](./public/result.png)
+![image2](./public/result2.png)
+![image1](./public/result3.png)
 
 ## Installation
 
